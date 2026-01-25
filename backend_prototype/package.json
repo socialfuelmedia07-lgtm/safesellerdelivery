@@ -1,0 +1,18 @@
+{
+    "name": "hyperlocal-backend-prototype",
+    "version": "1.0.0",
+    "description": "Prototype for Hyperlocal Delivery System",
+    "main": "src/simulation.ts",
+    "scripts": {
+        "start": "ts-node src/simulation.ts"
+    },
+    "dependencies": {
+        "uuid": "^9.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "@types/uuid": "^9.0.0",
+        "ts-node": "^10.9.1",
+        "typescript": "^5.0.0"
+    }
+}
