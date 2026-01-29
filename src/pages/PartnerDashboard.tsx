@@ -7,12 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
-import { 
-  Home, 
-  Settings, 
-  User, 
+import {
+  Home,
+  Settings,
+  User,
   LogOut,
   Menu,
   X,
@@ -142,8 +142,8 @@ const PartnerDashboard = () => {
               onClick={() => setActiveTab(item.id)}
               className={cn(
                 "flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors",
-                activeTab === item.id 
-                  ? "text-primary" 
+                activeTab === item.id
+                  ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -241,7 +241,7 @@ const PartnerDashboard = () => {
             {/* Account Settings */}
             <div className="bg-card rounded-xl p-6 border border-border space-y-4">
               <h2 className="text-lg font-semibold">Account Settings</h2>
-              
+
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="s-phone">Phone Number</Label>
@@ -329,7 +329,7 @@ const PartnerDashboard = () => {
                 <h1 className="text-2xl font-bold">Your Profile</h1>
                 <p className="text-muted-foreground">Manage your public information</p>
               </div>
-              <Button 
+              <Button
                 variant={editMode ? 'default' : 'outline'}
                 onClick={() => editMode ? handleSaveProfile() : setEditMode(true)}
               >
