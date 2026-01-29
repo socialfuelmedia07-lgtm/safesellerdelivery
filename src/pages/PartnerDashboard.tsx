@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Logo } from '@/components/Logo';
 import { StatCard } from '@/components/StatCard';
@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
+import { orderService, Order, OrderStatus } from '@/services/OrderService';
 import {
   Home,
   Settings,
@@ -27,12 +28,17 @@ import {
   Sun,
   MessageSquare,
   Globe,
-  Camera
+  Camera,
+  Package,
+  History,
+  Clock,
+  MapPin,
+  CheckCircle2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-type Tab = 'home' | 'settings' | 'profile';
+type Tab = 'home' | 'orders' | 'history' | 'settings' | 'profile';
 
 const PartnerDashboard = () => {
   const navigate = useNavigate();
@@ -41,6 +47,7 @@ const PartnerDashboard = () => {
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [profileData, setProfileData] = useState({
     name: user?.name || 'Rahul Kumar',
     phone: user?.phone || '+91 98765 12345',
@@ -49,6 +56,16 @@ const PartnerDashboard = () => {
     bio: 'Experienced delivery partner with 2+ years in logistics.',
   });
   const [complaint, setComplaint] = useState('');
+
+  useEffect(() => {
+    const unsubscribe = orderService.subscribe(newOrders => {
+      setOrders(newOrders);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const ongoingOrders = orders.filter(o => o.type === 'ongoing');
+  const historyOrders = orders.filter(o => o.type === 'history');
 
   const handleLogout = () => {
     logout();
@@ -66,8 +83,15 @@ const PartnerDashboard = () => {
     setComplaint('');
   };
 
+  const handleUpdateStatus = (orderId: string, status: OrderStatus) => {
+    orderService.updateOrderStatus(orderId, status);
+    toast.success(`Order status updated to ${status.replace('_', ' ')}`);
+  };
+
   const navItems = [
     { id: 'home' as Tab, label: 'Home', icon: Home },
+    { id: 'orders' as Tab, label: 'Orders', icon: Package },
+    { id: 'history' as Tab, label: 'History', icon: History },
     { id: 'settings' as Tab, label: 'Settings', icon: Settings },
     { id: 'profile' as Tab, label: 'Profile', icon: User },
   ];
@@ -159,73 +183,239 @@ const PartnerDashboard = () => {
         {activeTab === 'home' && (
           <div className="space-y-6 animate-fade-in">
             <div>
-              <h1 className="text-2xl font-bold">Hello, {profileData.name.split(' ')[0]}!</h1>
-              <p className="text-muted-foreground">Here's your performance overview</p>
+              <h1 className="text-2xl font-bold text-foreground">Welcome back, {profileData.name.split(' ')[0]}!</h1>
+              <p className="text-muted-foreground text-sm">Here's your delivery performance overview</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <StatCard
                 title="Total Earnings"
                 value={`₹${stats.totalEarnings.toLocaleString()}`}
+                change={`+₹${(stats.thisMonth * 0.1).toFixed(0)} today`}
+                changeType="positive"
                 icon="dollar"
               />
               <StatCard
-                title="This Month"
-                value={`₹${stats.thisMonth.toLocaleString()}`}
-                change="+15% from last month"
-                changeType="positive"
-                icon="trending"
-              />
-              <StatCard
-                title="Days with QuilBox"
-                value={stats.daysWorking}
-                icon="clock"
-              />
-              <StatCard
-                title="Your Rating"
-                value={stats.rating}
-                change="Top 10% performers"
-                changeType="positive"
-                icon="star"
-              />
-              <StatCard
-                title="Total Deliveries"
-                value={stats.totalDeliveries.toLocaleString()}
-                icon="truck"
-              />
-              <StatCard
-                title="Today's Deliveries"
-                value={stats.todayDeliveries}
-                change="2 pending"
+                title="Deliveries"
+                value={stats.totalDeliveries.toString()}
+                change={`${stats.todayDeliveries} today`}
                 changeType="neutral"
                 icon="package"
               />
+              <StatCard
+                title="Service Rating"
+                value={stats.rating.toString()}
+                change="Top 5% partner"
+                changeType="positive"
+                icon="star"
+              />
             </div>
 
-            <div className="bg-card rounded-xl p-6 border border-border">
-              <h2 className="text-lg font-semibold mb-4">Performance Summary</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center p-4 rounded-lg bg-secondary/50">
-                  <div className="flex items-center justify-center gap-1 mb-2">
-                    <Star className="w-5 h-5 text-warning fill-warning" />
-                    <span className="text-2xl font-bold">{stats.rating}</span>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <Package className="w-5 h-5 text-primary" /> Active Tasks
+                </h3>
+                {ongoingOrders.length > 0 ? (
+                  <div className="space-y-4">
+                    {ongoingOrders.slice(0, 2).map(order => (
+                      <div key={order.id} className="p-3 rounded-lg bg-secondary/30 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-bold">{order.id}</p>
+                          <p className="text-xs text-muted-foreground">{order.deliveryAddress.split(',')[0]}</p>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => setActiveTab('orders')}>
+                          View
+                        </Button>
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-sm text-muted-foreground">Customer Rating</p>
-                </div>
-                <div className="text-center p-4 rounded-lg bg-secondary/50">
-                  <div className="flex items-center justify-center gap-1 mb-2">
-                    <Calendar className="w-5 h-5 text-primary" />
-                    <span className="text-2xl font-bold">{stats.daysWorking}</span>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p className="text-sm">No active tasks. Take a break!</p>
                   </div>
-                  <p className="text-sm text-muted-foreground">Days Active</p>
-                </div>
-                <div className="text-center p-4 rounded-lg bg-secondary/50">
-                  <div className="flex items-center justify-center gap-1 mb-2">
-                    <Truck className="w-5 h-5 text-success" />
-                    <span className="text-2xl font-bold">{stats.totalDeliveries}</span>
+                )}
+              </div>
+
+              <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <History className="w-5 h-5 text-primary" /> Recent Activity
+                </h3>
+                {historyOrders.length > 0 ? (
+                  <div className="space-y-4">
+                    {historyOrders.slice(0, 2).map(order => (
+                      <div key={order.id} className="p-3 rounded-lg bg-secondary/30 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Delivered {order.id}</p>
+                          <p className="text-xs text-muted-foreground">{new Date(order.timestamp).toLocaleDateString()}</p>
+                        </div>
+                        <p className="text-sm font-bold text-primary">₹{order.total}</p>
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-sm text-muted-foreground">Deliveries Completed</p>
-                </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p className="text-sm">No recent activity found.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'orders' && (
+          <div className="space-y-6 animate-fade-in">
+            <div>
+              <h1 className="text-2xl font-bold">Ongoing Orders</h1>
+              <p className="text-muted-foreground">Manage your current deliveries</p>
+            </div>
+
+            {ongoingOrders.length === 0 ? (
+              <div className="bg-card rounded-xl p-12 border border-border text-center">
+                <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium">No ongoing orders</h3>
+                <p className="text-muted-foreground">You don't have any active deliveries at the moment.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6">
+                {ongoingOrders.map(order => (
+                  <div key={order.id} className="bg-card rounded-xl overflow-hidden border border-border shadow-sm hover:shadow-md transition-shadow">
+                    <div className="p-6 border-b border-border bg-secondary/20">
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-primary/10">
+                            <Package className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-lg">{order.id}</h3>
+                            <p className="text-sm text-muted-foreground">{new Date(order.timestamp).toLocaleString()}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider",
+                            order.status === 'pending' && "bg-yellow-500/10 text-yellow-500",
+                            order.status === 'packing' && "bg-blue-500/10 text-blue-500",
+                            order.status === 'on_way' && "bg-purple-500/10 text-purple-500",
+                            order.status === 'delivered' && "bg-green-500/10 text-green-500"
+                          )}>
+                            {order.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
+                            <User className="w-3 h-3" /> Customer Details
+                          </h4>
+                          <p className="font-medium">{order.customerName}</p>
+                          <p className="text-sm text-muted-foreground">{order.customerPhone}</p>
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
+                            <MapPin className="w-3 h-3" /> Delivery Address
+                          </h4>
+                          <p className="text-sm">{order.deliveryAddress}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
+                          <Truck className="w-3 h-3" /> Order Status Actions
+                        </h4>
+                        <div className="grid grid-cols-1 gap-2">
+                          <Button
+                            variant={order.status === 'packing' ? "default" : "outline"}
+                            className="justify-start gap-2 h-11"
+                            onClick={() => handleUpdateStatus(order.id, 'packing')}
+                          >
+                            <Package className="w-4 h-4" /> Order is packing
+                          </Button>
+                          <Button
+                            variant={order.status === 'on_way' ? "default" : "outline"}
+                            className="justify-start gap-2 h-11"
+                            onClick={() => handleUpdateStatus(order.id, 'on_way')}
+                          >
+                            <Truck className="w-4 h-4" /> Order is on way
+                          </Button>
+                          <Button
+                            variant={order.status === 'delivered' ? "default" : "outline"}
+                            className="justify-start gap-2 h-11 border-green-500/50 hover:bg-green-500/10 hover:text-green-600 dark:hover:text-green-400"
+                            onClick={() => handleUpdateStatus(order.id, 'delivered')}
+                          >
+                            <CheckCircle2 className="w-4 h-4" /> Order is placed
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="px-6 py-4 bg-secondary/10 border-t border-border flex justify-between items-center">
+                      <div className="flex gap-4">
+                        <span className="text-sm text-muted-foreground">Items: <span className="text-foreground font-medium">{order.items.length}</span></span>
+                      </div>
+                      <div className="text-lg font-bold text-primary">₹{order.total}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="space-y-6 animate-fade-in">
+            <div>
+              <h1 className="text-2xl font-bold">Delivery History</h1>
+              <p className="text-muted-foreground">Track your completed assignments</p>
+            </div>
+
+            <div className="bg-card rounded-xl border border-border overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border bg-secondary/30">
+                      <th className="text-left p-4 font-bold text-xs uppercase tracking-wider">Order ID</th>
+                      <th className="text-left p-4 font-bold text-xs uppercase tracking-wider">Customer</th>
+                      <th className="text-left p-4 font-bold text-xs uppercase tracking-wider">Date</th>
+                      <th className="text-left p-4 font-bold text-xs uppercase tracking-wider">Amount</th>
+                      <th className="text-left p-4 font-bold text-xs uppercase tracking-wider">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyOrders.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-12 text-center text-muted-foreground">
+                          No history found
+                        </td>
+                      </tr>
+                    ) : (
+                      historyOrders.map(order => (
+                        <tr key={order.id} className="border-b border-border/50 hover:bg-secondary/20 transition-colors">
+                          <td className="p-4 font-medium">{order.id}</td>
+                          <td className="p-4 text-sm">
+                            <p className="font-medium">{order.customerName}</p>
+                            <p className="text-xs text-muted-foreground">{order.customerPhone}</p>
+                          </td>
+                          <td className="p-4 text-sm text-muted-foreground">
+                            {new Date(order.timestamp).toLocaleDateString()}
+                          </td>
+                          <td className="p-4 font-bold text-primary">₹{order.total}</td>
+                          <td className="p-4">
+                            <span className={cn(
+                              "text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter",
+                              order.status === 'delivered' ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+                            )}>
+                              {order.status === 'delivered' ? 'Success' : 'Failed'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
